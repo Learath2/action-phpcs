@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import * as Webhooks from '@octokit/webhooks';
+import * as Webhooks from '@octokit/webhooks-types';
 import picomatch from 'picomatch';
 
 interface ChangedFiles {
@@ -19,8 +19,10 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
   const globs = pattern.length ? pattern.split(',') : ['**.php'];
   const isMatch = picomatch(globs);
   console.log('Filter patterns:', globs, isMatch('src/test.php'));
-  const payload = github.context
-    .payload as Webhooks.EventPayloads.WebhookPayloadPullRequest;
+  const base = github.context.payload.pull_request
+    ? (github.context.payload as Webhooks.PullRequestEvent).pull_request.base
+        .sha
+    : (github.context.payload as Webhooks.PushEvent).before;
 
   /*
     getting them from Git
@@ -36,7 +38,7 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
         '--name-status',
         '--diff-filter=d', // we don't need deleted files
         '-r',
-        `${payload.pull_request.base.sha}..`,
+        `${base}..`,
       ],
       {
         windowsHide: true,

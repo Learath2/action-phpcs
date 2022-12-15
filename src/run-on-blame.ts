@@ -4,7 +4,6 @@ import { blame } from 'git-blame-json';
 import * as path from 'path';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import * as Webhooks from '@octokit/webhooks';
 
 export async function runOnBlame(files: string[]): Promise<void> {
   try {
@@ -65,7 +64,8 @@ export async function runOnBlame(files: string[]): Promise<void> {
       }
     }
   } catch (err) {
-    core.debug(err);
-    core.setFailed(err);
+    const e = err as Error;
+    core.debug(e.message);
+    core.setFailed(e);
   }
 }

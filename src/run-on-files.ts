@@ -24,8 +24,9 @@ export function runOnCompleteFiles(files: string[]): number {
     });
     return 0;
   } catch (err) {
-    core.debug(err);
-    core.setFailed(err);
+    const e = err as Error;
+    core.debug(e.message);
+    core.setFailed(e);
     return 1;
   }
 }
