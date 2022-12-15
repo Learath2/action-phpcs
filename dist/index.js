@@ -56,14 +56,14 @@ async function getChangedFiles() {
         case 'push':
             {
                 const payload = github.context.payload;
-                if (payload.forced) {
-                    //TODO: Implement this with octokit
-                    core.warning(`Linting for forced pushes isn't implemented yet`);
-                    return {
-                        added: [],
-                        modified: [],
-                    };
-                }
+                /*if (payload.forced) {
+                  //TODO: Implement this with octokit
+                  core.warning(`Linting for forced pushes isn't implemented yet`);
+                  return {
+                    added: [],
+                    modified: [],
+                  };
+                }*/
                 base = payload.before;
             }
             break;

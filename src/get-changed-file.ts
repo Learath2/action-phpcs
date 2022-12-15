@@ -29,14 +29,14 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
     case 'push':
       {
         const payload = github.context.payload as Webhooks.PushEvent;
-        if (payload.forced) {
+        /*if (payload.forced) {
           //TODO: Implement this with octokit
           core.warning(`Linting for forced pushes isn't implemented yet`);
           return {
             added: [],
             modified: [],
           };
-        }
+        }*/
 
         base = payload.before;
       }
