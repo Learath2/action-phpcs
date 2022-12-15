@@ -47,24 +47,23 @@ async function getChangedFiles() {
     const globs = pattern.length ? pattern.split(',') : ['**.php'];
     const isMatch = (0, picomatch_1.default)(globs);
     core.info(`Filter patterns: ${globs.join()}`);
+    let forced = false;
     let base = '';
+    let new_head = '';
     switch (github.context.eventName) {
         case 'pull_request':
-            base = github.context.payload.pull_request
-                .base.sha;
+            {
+                const payload = github.context.payload;
+                base = payload.pull_request.base.sha;
+                new_head = payload.pull_request.head.sha;
+            }
             break;
         case 'push':
             {
                 const payload = github.context.payload;
-                if (payload.forced) {
-                    //TODO: Implement this with octokit
-                    core.warning(`Linting for forced pushes isn't implemented yet`);
-                    return {
-                        added: [],
-                        modified: [],
-                    };
-                }
+                forced = payload.forced;
                 base = payload.before;
+                new_head = payload.after;
             }
             break;
         default:
@@ -80,7 +79,7 @@ async function getChangedFiles() {
       git diff-tree --no-commit-id --name-status --diff-filter=d -r ${{ github.event.pull_request.base.sha }}..${{ github.event.after }}
     */
     try {
-        const git = (0, child_process_1.spawn)('git', [
+        const git = (!forced ? (0, child_process_1.spawn)('git', [
             '--no-pager',
             'diff-tree',
             '--no-commit-id',
@@ -91,7 +90,13 @@ async function getChangedFiles() {
         ], {
             windowsHide: true,
             timeout: 5000,
-        }).on('exit', code => {
+        }) :
+            (0, child_process_1.spawn)('git', [
+                '--no-pager',
+                'ls-tree',
+                '--name-only',
+                `${new_head}`
+            ])).on('exit', code => {
             if (code) {
                 core.debug(`git: ${code}`);
                 if (code != 0) {
@@ -109,22 +114,35 @@ async function getChangedFiles() {
             added: [],
             modified: [],
         };
-        for await (const line of readline) {
-            core.debug(`${line}`);
-            const parsed = /^(?<status>[ACMR])[\s\t]+(?<file>\S+)$/.exec(line);
-            if (parsed === null || parsed === void 0 ? void 0 : parsed.groups) {
-                const { status, file } = parsed.groups;
-                // ensure file exists
-                if (isMatch(file) && (0, fs_1.existsSync)(file)) {
-                    switch (status) {
-                        case 'A':
-                        case 'C':
-                        case 'R':
-                            result.added.push(file);
-                            break;
-                        case 'M':
-                            result.modified.push(file);
+        if (!forced) {
+            for await (const line of readline) {
+                core.debug(`${line}`);
+                const parsed = /^(?<status>[ACMR])[\s\t]+(?<file>\S+)$/.exec(line);
+                if (parsed === null || parsed === void 0 ? void 0 : parsed.groups) {
+                    const { status, file } = parsed.groups;
+                    // ensure file exists
+                    if (isMatch(file) && (0, fs_1.existsSync)(file)) {
+                        switch (status) {
+                            case 'A':
+                            case 'C':
+                            case 'R':
+                                result.added.push(file);
+                                break;
+                            case 'M':
+                                result.modified.push(file);
+                        }
                     }
+                }
+            }
+        }
+        else {
+            for await (const line of readline) {
+                core.debug(`${line}`);
+                if (isMatch(line) && (0, fs_1.existsSync)(line)) {
+                    result.added.push(line);
+                }
+                else {
+                    core.error(`git ls-tree returned file ${line} that doesn't exist?`);
                 }
             }
         }
