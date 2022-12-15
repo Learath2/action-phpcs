@@ -18,11 +18,24 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
   });
   const globs = pattern.length ? pattern.split(',') : ['**.php'];
   const isMatch = picomatch(globs);
-  console.log('Filter patterns:', globs, isMatch('src/test.php'));
-  const base = github.context.payload.pull_request
-    ? (github.context.payload as Webhooks.PullRequestEvent).pull_request.base
-        .sha
-    : (github.context.payload as Webhooks.PushEvent).before;
+  core.info(`Filter patterns: ${globs.join()}`);
+
+  let base = '';
+  switch (github.context.eventName) {
+    case 'pull_request':
+      base = (github.context.payload as Webhooks.PullRequestEvent).pull_request
+        .base.sha;
+      break;
+    case 'push':
+      base = (github.context.payload as Webhooks.PushEvent).before;
+      break;
+    default:
+      core.error(`Unknown event type ${github.context.eventName}`);
+      return {
+        added: [],
+        modified: [],
+      };
+  }
 
   /*
     getting them from Git
@@ -73,7 +86,7 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
     }
     return result;
   } catch (err) {
-    console.error(err);
+    core.error((err as Error).message);
     return {
       added: [],
       modified: [],

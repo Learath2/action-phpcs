@@ -46,11 +46,23 @@ async function getChangedFiles() {
     });
     const globs = pattern.length ? pattern.split(',') : ['**.php'];
     const isMatch = (0, picomatch_1.default)(globs);
-    console.log('Filter patterns:', globs, isMatch('src/test.php'));
-    const base = github.context.payload.pull_request
-        ? github.context.payload.pull_request.base
-            .sha
-        : github.context.payload.before;
+    core.info(`Filter patterns: ${globs.join()}`);
+    let base = '';
+    switch (github.context.eventName) {
+        case 'pull_request':
+            base = github.context.payload.pull_request
+                .base.sha;
+            break;
+        case 'push':
+            base = github.context.payload.before;
+            break;
+        default:
+            core.error(`Unknown event type ${github.context.eventName}`);
+            return {
+                added: [],
+                modified: [],
+            };
+    }
     /*
       getting them from Git
       git diff-tree --no-commit-id --name-status --diff-filter=d -r ${{ github.event.pull_request.base.sha }}..${{ github.event.after }}
@@ -96,7 +108,7 @@ async function getChangedFiles() {
         return result;
     }
     catch (err) {
-        console.error(err);
+        core.error(err.message);
         return {
             added: [],
             modified: [],
