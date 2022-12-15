@@ -54,7 +54,18 @@ async function getChangedFiles() {
                 .base.sha;
             break;
         case 'push':
-            base = github.context.payload.before;
+            {
+                const payload = github.context.payload;
+                if (payload.forced) {
+                    //TODO: Implement this with octokit
+                    core.warning(`Linting for forced pushes isn't implemented yet`);
+                    return {
+                        added: [],
+                        modified: [],
+                    };
+                }
+                base = payload.before;
+            }
             break;
         default:
             core.error(`Unknown event type ${github.context.eventName}`);
@@ -63,6 +74,7 @@ async function getChangedFiles() {
                 modified: [],
             };
     }
+    core.debug(`Base SHA: ${base}`);
     /*
       getting them from Git
       git diff-tree --no-commit-id --name-status --diff-filter=d -r ${{ github.event.pull_request.base.sha }}..${{ github.event.after }}
@@ -79,6 +91,16 @@ async function getChangedFiles() {
         ], {
             windowsHide: true,
             timeout: 5000,
+        }).on('exit', code => {
+            if (code) {
+                core.debug(`git: ${code}`);
+                if (code != 0) {
+                    core.error(`git exited with ${code}`);
+                }
+            }
+        });
+        git.stderr.on('data', (d) => {
+            core.error(`git stderr: ${d}`);
         });
         const readline = (0, readline_1.createInterface)({
             input: git.stdout,
@@ -88,6 +110,7 @@ async function getChangedFiles() {
             modified: [],
         };
         for await (const line of readline) {
+            core.debug(`${line}`);
             const parsed = /^(?<status>[ACMR])[\s\t]+(?<file>\S+)$/.exec(line);
             if (parsed === null || parsed === void 0 ? void 0 : parsed.groups) {
                 const { status, file } = parsed.groups;

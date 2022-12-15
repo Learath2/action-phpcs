@@ -27,7 +27,19 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
         .base.sha;
       break;
     case 'push':
-      base = (github.context.payload as Webhooks.PushEvent).before;
+      {
+        const payload = github.context.payload as Webhooks.PushEvent;
+        if (payload.forced) {
+          //TODO: Implement this with octokit
+          core.warning(`Linting for forced pushes isn't implemented yet`);
+          return {
+            added: [],
+            modified: [],
+          };
+        }
+
+        base = payload.before;
+      }
       break;
     default:
       core.error(`Unknown event type ${github.context.eventName}`);
@@ -36,6 +48,8 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
         modified: [],
       };
   }
+
+  core.debug(`Base SHA: ${base}`);
 
   /*
     getting them from Git
@@ -57,7 +71,19 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
         windowsHide: true,
         timeout: 5000,
       }
-    );
+    ).on('exit', code => {
+      if (code) {
+        core.debug(`git: ${code}`);
+        if (code != 0) {
+          core.error(`git exited with ${code}`);
+        }
+      }
+    });
+
+    git.stderr.on('data', (d: string) => {
+      core.error(`git stderr: ${d}`);
+    });
+
     const readline = createInterface({
       input: git.stdout,
     });
@@ -66,6 +92,7 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
       modified: [],
     };
     for await (const line of readline) {
+      core.debug(`${line}`);
       const parsed = /^(?<status>[ACMR])[\s\t]+(?<file>\S+)$/.exec(line);
       if (parsed?.groups) {
         const { status, file } = parsed.groups;
