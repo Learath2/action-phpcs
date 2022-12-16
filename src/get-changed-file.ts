@@ -20,6 +20,15 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
   const isMatch = picomatch(globs);
   core.info(`Filter patterns: ${globs.join()}`);
 
+  const excludePattern = core.getInput('exclude', {
+    required: false,
+  });
+  const excludeGlobs = excludePattern.length ? excludePattern.split(',') : [];
+  const isExcluded = excludeGlobs.length
+    ? picomatch(excludeGlobs)
+    : () => false;
+  core.info(`Exclude patterns: ${excludeGlobs.join()}`);
+
   let forced = false;
   let base = '';
   let new_head = '';
@@ -101,7 +110,7 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
         if (parsed?.groups) {
           const { status, file } = parsed.groups;
           // ensure file exists
-          if (isMatch(file) && existsSync(file)) {
+          if (isMatch(file) && existsSync(file) && !isExcluded(file)) {
             switch (status) {
               case 'A':
               case 'C':
@@ -118,10 +127,8 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
     } else {
       for await (const line of readline) {
         core.debug(`${line}`);
-        if (isMatch(line) && existsSync(line)) {
+        if (isMatch(line) && existsSync(line) && !isExcluded(line)) {
           result.added.push(line);
-        } else {
-          core.error(`git ls-tree returned file ${line} that doesn't exist?`);
         }
       }
     }

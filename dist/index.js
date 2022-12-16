@@ -47,6 +47,14 @@ async function getChangedFiles() {
     const globs = pattern.length ? pattern.split(',') : ['**.php'];
     const isMatch = (0, picomatch_1.default)(globs);
     core.info(`Filter patterns: ${globs.join()}`);
+    const excludePattern = core.getInput('exclude', {
+        required: false,
+    });
+    const excludeGlobs = excludePattern.length ? excludePattern.split(',') : [];
+    const isExcluded = excludeGlobs.length
+        ? (0, picomatch_1.default)(excludeGlobs)
+        : () => false;
+    core.info(`Exclude patterns: ${excludeGlobs.join()}`);
     let forced = false;
     let base = '';
     let new_head = '';
@@ -79,24 +87,20 @@ async function getChangedFiles() {
       git diff-tree --no-commit-id --name-status --diff-filter=d -r ${{ github.event.pull_request.base.sha }}..${{ github.event.after }}
     */
     try {
-        const git = (!forced ? (0, child_process_1.spawn)('git', [
-            '--no-pager',
-            'diff-tree',
-            '--no-commit-id',
-            '--name-status',
-            '--diff-filter=d',
-            '-r',
-            `${base}..`,
-        ], {
-            windowsHide: true,
-            timeout: 5000,
-        }) :
-            (0, child_process_1.spawn)('git', [
+        const git = (!forced
+            ? (0, child_process_1.spawn)('git', [
                 '--no-pager',
-                'ls-tree',
-                '--name-only',
-                `${new_head}`
-            ])).on('exit', code => {
+                'diff-tree',
+                '--no-commit-id',
+                '--name-status',
+                '--diff-filter=d',
+                '-r',
+                `${base}..`,
+            ], {
+                windowsHide: true,
+                timeout: 5000,
+            })
+            : (0, child_process_1.spawn)('git', ['--no-pager', 'ls-tree', '--name-only', `${new_head}`])).on('exit', code => {
             if (code) {
                 core.debug(`git: ${code}`);
                 if (code != 0) {
@@ -121,7 +125,7 @@ async function getChangedFiles() {
                 if (parsed === null || parsed === void 0 ? void 0 : parsed.groups) {
                     const { status, file } = parsed.groups;
                     // ensure file exists
-                    if (isMatch(file) && (0, fs_1.existsSync)(file)) {
+                    if (isMatch(file) && (0, fs_1.existsSync)(file) && !isExcluded(file)) {
                         switch (status) {
                             case 'A':
                             case 'C':
@@ -138,11 +142,8 @@ async function getChangedFiles() {
         else {
             for await (const line of readline) {
                 core.debug(`${line}`);
-                if (isMatch(line) && (0, fs_1.existsSync)(line)) {
+                if (isMatch(line) && (0, fs_1.existsSync)(line) && !isExcluded(line)) {
                     result.added.push(line);
-                }
-                else {
-                    core.error(`git ls-tree returned file ${line} that doesn't exist?`);
                 }
             }
         }
