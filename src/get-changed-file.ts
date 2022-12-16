@@ -81,7 +81,13 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
               timeout: 5000,
             }
           )
-        : spawn('git', ['--no-pager', 'ls-tree', '--name-only', `${new_head}`])
+        : spawn('git', [
+            '--no-pager',
+            'ls-tree',
+            '-r',
+            '--name-only',
+            `${new_head}`,
+          ])
     ).on('exit', code => {
       if (code) {
         core.debug(`git: ${code}`);

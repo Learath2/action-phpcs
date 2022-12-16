@@ -100,7 +100,7 @@ async function getChangedFiles() {
                 windowsHide: true,
                 timeout: 5000,
             })
-            : (0, child_process_1.spawn)('git', ['--no-pager', 'ls-tree', '--name-only', `${new_head}`])).on('exit', code => {
+            : (0, child_process_1.spawn)('git', ['--no-pager', 'ls-tree', '-r', '--name-only', `${new_head}`])).on('exit', code => {
             if (code) {
                 core.debug(`git: ${code}`);
                 if (code != 0) {
