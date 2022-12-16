@@ -29,7 +29,7 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
     : () => false;
   core.info(`Exclude patterns: ${excludeGlobs.join()}`);
 
-  let forced = false;
+  let reLint = false;
   let base = '';
   let new_head = '';
   switch (github.context.eventName) {
@@ -43,9 +43,10 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
     case 'push':
       {
         const payload = github.context.payload as Webhooks.PushEvent;
-        forced = payload.forced;
         base = payload.before;
         new_head = payload.after;
+        reLint =
+          payload.forced || base === '0000000000000000000000000000000000000000';
       }
       break;
     default:
@@ -64,7 +65,7 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
   */
   try {
     const git = (
-      !forced
+      !reLint
         ? spawn(
             'git',
             [
@@ -109,7 +110,7 @@ export async function getChangedFiles(): Promise<ChangedFiles> {
       modified: [],
     };
 
-    if (!forced) {
+    if (!reLint) {
       for await (const line of readline) {
         core.debug(`${line}`);
         const parsed = /^(?<status>[ACMR])[\s\t]+(?<file>\S+)$/.exec(line);

@@ -55,7 +55,7 @@ async function getChangedFiles() {
         ? (0, picomatch_1.default)(excludeGlobs)
         : () => false;
     core.info(`Exclude patterns: ${excludeGlobs.join()}`);
-    let forced = false;
+    let reLint = false;
     let base = '';
     let new_head = '';
     switch (github.context.eventName) {
@@ -69,9 +69,9 @@ async function getChangedFiles() {
         case 'push':
             {
                 const payload = github.context.payload;
-                forced = payload.forced;
                 base = payload.before;
                 new_head = payload.after;
+                reLint = payload.forced || base === '0000000000000000000000000000000000000000';
             }
             break;
         default:
@@ -87,7 +87,7 @@ async function getChangedFiles() {
       git diff-tree --no-commit-id --name-status --diff-filter=d -r ${{ github.event.pull_request.base.sha }}..${{ github.event.after }}
     */
     try {
-        const git = (!forced
+        const git = (!reLint
             ? (0, child_process_1.spawn)('git', [
                 '--no-pager',
                 'diff-tree',
@@ -100,7 +100,13 @@ async function getChangedFiles() {
                 windowsHide: true,
                 timeout: 5000,
             })
-            : (0, child_process_1.spawn)('git', ['--no-pager', 'ls-tree', '-r', '--name-only', `${new_head}`])).on('exit', code => {
+            : (0, child_process_1.spawn)('git', [
+                '--no-pager',
+                'ls-tree',
+                '-r',
+                '--name-only',
+                `${new_head}`,
+            ])).on('exit', code => {
             if (code) {
                 core.debug(`git: ${code}`);
                 if (code != 0) {
@@ -118,7 +124,7 @@ async function getChangedFiles() {
             added: [],
             modified: [],
         };
-        if (!forced) {
+        if (!reLint) {
             for await (const line of readline) {
                 core.debug(`${line}`);
                 const parsed = /^(?<status>[ACMR])[\s\t]+(?<file>\S+)$/.exec(line);
